@@ -34,23 +34,28 @@ class Game:
     async def game_on_reaction(self, reaction, user):
         self.menus_handler.on_reaction_add_menu(reaction, user)
         if self.state == 1:
-            self.set_game_type(self.menus_handler.menu_list[0].result_list[0][1])
-            await self.invite_player()
+            if user.id == self.players[0].id:
+                self.set_game_type(self.menus_handler.menu_list[0].result_list[0][1])
+                await self.invite_player()
 
-        elif self.state == 2:
+        if self.state == 2:
             await self.add_player(reaction, user)
 
-        elif self.state == 3:
-            await self.set_kit()
+        if utilities.check_presence(user.id, self.players_id):
+            if self.state == 3:
+                await self.set_kit()
 
-        elif self.state == 4:
-            await self.set_biome()
+            elif self.state == 4:
+                await self.set_biome()
 
-        elif self.state == 5:
-            pass
+            elif self.state == 5:
+                self.fight.menu_handler.on_reaction_add_menu(reaction, user)
+                await self.play_fight()
 
     async def game_on_reaction_remove(self, reaction, user):
         self.menus_handler.on_reaction_remove_menu(reaction, user)
+        if self.state == 5:
+            self.fight.menu_handler.on_reaction_remove_menu(reaction, user)
 
     async def start(self, message):
         self.players = [message.author]
@@ -120,8 +125,14 @@ class Game:
             await self.start_fight()
 
     async def start_fight(self):
-        self.fight = fight.Fight(self.players, self.channel, self.biome)
-        await self.fight.display_action()
+        self.fight = fight.Fight(self.game_players, self.channel, self.biome)
+        await self.fight.display_fight()
+
+    async def play_fight(self):
+        if self.fight.menu_handler.menu_list[0].menu_is_answered():
+            if self.fight.menu_handler.menu_list[1].menu_is_answered():
+                if self.fight.menu_handler.menu_list[2].menu_is_answered():
+                    await self.fight.play_round()
 
 
 

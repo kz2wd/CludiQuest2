@@ -1,4 +1,5 @@
 import discord
+import datetime
 
 
 alphabet = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
@@ -7,7 +8,7 @@ alphabet = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
 validation = "`Valider`"
 
 emote_alphabet = ['🇦', '🇧', '🇨', '🇩', '🇪', '🇫', '🇬', '🇭', '🇮', '🇯', '🇰', '🇱', '🇲',
-        '🇳', '🇴', '🇵', '🇶', '🇷', '🇸', '🇹', '🇺', '🇻', '🇼', '🇽', '🇾', '🇿']
+                  '🇳', '🇴', '🇵', '🇶', '🇷', '🇸', '🇹', '🇺', '🇻', '🇼', '🇽', '🇾', '🇿']
 
 go_forward = "⏩"
 
@@ -42,8 +43,8 @@ class Menu:  # first version of menu
 
 
 class SimpleMenu:  # first version of menu
-    def __init__(self, emote, allowed_id, channel, sentence=None, number_of_response=1, active_state=0):
-        self.emote = emote
+    def __init__(self, emotes, allowed_id, channel, sentence=None, number_of_response=1, active_state=0):
+        self.emotes = emotes
         self.allowed_id = allowed_id  # list of all player(s)'s id allowed to answer
         self.channel = channel
         self.number_of_response = number_of_response
@@ -62,12 +63,21 @@ class SimpleMenu:  # first version of menu
     async def display(self):
         x = await self.channel.send(self.sentence)
 
-        for i in range(len(self.emote)):
-            await x.add_reaction(self.emote[i])
+        for i in range(len(self.emotes)):
+            await x.add_reaction(self.emotes[i])
 
     async def validate(self):
         x = await self.channel.send(validation)
         await x.add_reaction(go_forward)
+
+    def menu_is_answered(self):
+        everybody_answered = True
+        for allowed_id in self.result_list:
+            for answer in range(self.number_of_response):
+                if allowed_id[answer + 1] == -1:
+                    everybody_answered = False
+
+        return everybody_answered
 
 
 class BetterMenu:  # better version using embeds
@@ -106,7 +116,7 @@ class BetterMenu:  # better version using embeds
         everybody_answered = True
         for allowed_id in self.result_list:
             for answer in range(self.number_of_response):
-                if allowed_id[answer] == -1:
+                if allowed_id[answer + 1] == -1:
                     everybody_answered = False
 
         return everybody_answered
@@ -143,11 +153,50 @@ class MenuHandler:  # a way to manage menus
                                         h.result_list[i][k + 1] = -1
 
 
+class SimpleMenuHandler:  # a way to manage menus
+    def __init__(self):
+        self.menu_list = []
+        self.state = 0  # you can change this to activate or deactivate menus
+        self.emotes = []
+
+    def on_reaction_add_menu(self, reaction, user):
+        for h, menu in enumerate(self.menu_list):
+            if self.state == menu.active_state:
+                for i, item_id in enumerate(menu.allowed_id):
+                    if user.id == item_id:
+                        for j, item in enumerate(self.emotes[h]):
+                            if item == reaction.emoji:
+                                number_of_response_not_filled = True
+                                for k in range(menu.number_of_response):
+                                    if number_of_response_not_filled:
+                                        if menu.result_list[i][k + 1] == -1:
+                                            menu.result_list[i][k + 1] = j
+                                            number_of_response_not_filled = False
+
+    def on_reaction_remove_menu(self, reaction, user):
+        for h, menu in enumerate(self.menu_list):
+            if self.state == menu.active_state:
+                for i, item_id in enumerate(menu.allowed_id):
+                    if user.id == item_id:
+                        for j, item in enumerate(self.emotes[h]):
+                            if item == reaction.emoji:
+                                for k in range(menu.number_of_response):
+                                    if menu.result_list[i][k + 1] == j:
+                                        menu.result_list[i][k + 1] = -1
+
+    def add_simple_menu(self, simple_menu):
+        self.menu_list.append(simple_menu)
+        self.emotes.append(simple_menu.emotes)
+
+
 class EmbedCreator:
     def __init__(self, title, description, choices, color):
-        self.embed_message = discord.Embed(title=title, description=description, color=color)
+        self.embed_message = discord.Embed(title=title, description=description, color=color,
+                                           timestamp=datetime.datetime.utcnow())
         for counter, item in enumerate(choices):
             self.embed_message.add_field(name=item, value=alphabet[counter], inline=True)
 
         self.embed_message.set_footer(text="Cliquez sur une réaction pour faire votre choix")
+
+
 
